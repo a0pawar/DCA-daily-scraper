@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: '3.x'
 
@@ -26,14 +26,14 @@ jobs:
         playwright install-deps
 
     - name: Run price collection script
-      run: python dca-retail_prices.py  # Replace with your script's filename
+      run: python script_name.py  # Replace with your script's filename
 
     - name: Upload CSV file
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: price-data-${{ github.run_number }}
         path: data/*.csv
-        retention-days: 30  # Maximum value allowed by GitHub
+        retention-days: 90
 
     - name: Commit files
       run: |
