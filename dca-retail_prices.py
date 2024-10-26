@@ -12,7 +12,7 @@ def get_yesterday_date():
     return yesterday.strftime("%d/%m/%Y")
 
 def run(playwright: Playwright, date) -> None:
-    browser = playwright.chromium.launch(headless=False)  # Changed to headless=True for GitHub Actions
+    browser = playwright.chromium.launch(headless=True)  # Changed to headless=True for GitHub Actions
     context = browser.new_context()
     page = context.new_page()
     page.goto("https://fcainfoweb.nic.in/reports/report_menu_web.aspx")
