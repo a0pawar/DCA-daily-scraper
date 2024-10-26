@@ -1,0 +1,6 @@
+playwright==1.41.2
+pandas==2.2.0
+numpy==1.26.3
+beautifulsoup4==4.12.2
+lxml==5.1.0
+python-dateutil==2.8.2
