@@ -27,3 +27,19 @@ jobs:
 
     - name: Run price collection script
       run: python dca-retail_prices.py  # Replace with your script's filename
+
+    - name: Upload CSV file
+      uses: actions/upload-artifact@v2
+      with:
+        name: price-data-${{ github.run_number }}
+        path: data/*.csv
+        retention-days: 30  # Maximum value allowed by GitHub
+
+    - name: Commit files
+      run: |
+        git config --local user.name "GitHub Action"
+        git add data/*.csv
+        git commit -m "Add price data for $(date +'%Y-%m-%d')" || echo "No changes to commit"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
