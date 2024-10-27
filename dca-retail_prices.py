@@ -67,7 +67,8 @@ if __name__ == "__main__":
         run(playwright, date)
 
 
-dt_temp = pd.read_csv(f'data\DCA_price_{date.replace("/", "-")}.csv')
+ofile = os.path.join('data', f'DCA_price_{date.replace("/", "-")}.csv')
+dt_temp = pd.read_csv(ofile)
 date_add = dt_temp.columns[0].split(" ")[1].replace("/","-")
 vals = dt_temp['Average Price'].values
 
