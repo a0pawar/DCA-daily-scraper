@@ -65,3 +65,17 @@ if __name__ == "__main__":
     date = get_yesterday_date()
     with sync_playwright() as playwright:
         run(playwright, date)
+
+
+dt_temp = pd.read_csv(f'data\DCA_price_{date.replace("/", "-")}.csv')
+date_add = dt_temp.columns[0].split(" ")[1].replace("/","-")
+vals = dt_temp['Average Price'].values
+
+# Read Excel file
+df = pd.read_excel('dca_test.xlsx')
+
+# Add new column
+df[f'{date_add}'] = vals
+
+# Save updated file
+df.to_excel('dca_test.xlsx', index=False)
