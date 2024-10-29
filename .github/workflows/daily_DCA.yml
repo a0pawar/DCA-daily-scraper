@@ -48,11 +48,24 @@ jobs:
         git commit -m "Added price data and updated Excel file on $(date +'%Y-%m-%d')" || echo "No changes to commit"
         git push
 
-    - name: Commit files to collaborator repository
+    - name: Push to collaborator repository
+      env:
+        COLAB_REPO_PAT: ${{ secrets.COLAB_REPO_PAT }}
       run: |
-        git remote add collaborator_repo https://a0pawar:${{ secrets.COLAB_REPO_PAT }}@github.com/abhiruchi97/Inflation-monitor.git
-        git fetch collaborator_repo
-        git checkout -b sync-collaborator-branch
-        git add data/*.csv dca_test.xlsx
-        git commit -m "Added price data and updated Excel file to collaborator repo on $(date +'%Y-%m-%d')" || echo "No changes to commit"
-        git push collaborator_repo sync-collaborator-branch --force
+        git config --global user.name "GitHub Action"
+        git config --global user.email "action@github.com"
+        
+        # Create a temporary directory for the collaborator repo
+        mkdir temp_repo
+        cd temp_repo
+        
+        # Clone the collaborator repository using PAT
+        git clone https://x-access-token:${COLAB_REPO_PAT}@github.com/abhiruchi97/Inflation-monitor.git .
+        
+        # Copy only the Excel file from the main repository
+        cp ../dca_test.xlsx .
+        
+        # Commit and push changes
+        git add dca_test.xlsx
+        git commit -m "Updated Excel file on $(date +'%Y-%m-%d')" || echo "No changes to commit"
+        git push origin main
