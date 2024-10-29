@@ -47,3 +47,12 @@ jobs:
         git add data/*.csv dca_test.xlsx
         git commit -m "Added price data and updated Excel file on $(date +'%Y-%m-%d')" || echo "No changes to commit"
         git push
+
+    - name: Commit files to collaborator repository
+      run: |
+        git remote add collaborator_repo https://a0pawar:${{ secrets.COLAB_REPO_PAT }}@github.com/abhiruchi97/Inflation-monitor.git
+        git fetch collaborator_repo
+        git checkout -b sync-collaborator-branch
+        git add data/*.csv dca_test.xlsx
+        git commit -m "Added price data and updated Excel file to collaborator repo on $(date +'%Y-%m-%d')" || echo "No changes to commit"
+        git push collaborator_repo sync-collaborator-branch --force
