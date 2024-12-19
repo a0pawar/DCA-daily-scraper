@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   collect-price-data:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v4
       with:
@@ -23,6 +23,8 @@ jobs:
         
     - name: Install dependencies
       run: |
+        sudo apt-get update
+        sudo apt-get install -y libasound2 libicu66 libffi7
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         playwright install
