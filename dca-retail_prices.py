@@ -118,7 +118,7 @@ def run(playwright: Playwright, date, reader) -> None:
     verbose = "Daily Retail Prices Of Essential Commodities"
     df.columns = df.iloc[1,:]
     df = df.iloc[2:,:]
-    df[daily_date] = [verbose, unit] + [np.nan]*20
+    df[daily_date] = [verbose, unit] + [np.nan] * (len(df) - 2)
     cols = [daily_date] + [col for col in df.columns if col != daily_date]
     df = df[cols]
     
