@@ -239,21 +239,21 @@ def run(playwright: Playwright, date: str):
 
         # First column = commodity name
         commodity_col = df.columns[0]
-
-        # Extract Average Price row
-        avg_row = df[df[commodity_col].str.contains("Average", case=False)]
-
+        
+        avg_row = df[df[commodity_col].str.strip().eq("Average Price")]
+        
         if avg_row.empty:
-            raise RuntimeError("Average Price row not found")
-
+            raise RuntimeError(f"'Average Price' row not found. Found rows: {df[commodity_col].unique()}")
+        
         price_series = (
             avg_row
             .iloc[0, 1:]
             .replace("", np.nan)
             .astype(float)
         )
-
-        price_series.index = headers[1:]
+        
+        price_series.index = df.columns[1:]
+        
 
         os.makedirs("data", exist_ok=True)
         out_file = f"data/DCA_price_{date.replace('/', '-')}.csv"
