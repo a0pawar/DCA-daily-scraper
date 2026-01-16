@@ -1,79 +1,4 @@
-# name: Daily Price Data Collection
-# on:
-#   schedule:
-#     - cron: '30 2 * * *'
-#   workflow_dispatch:
-
-# permissions:
-#   contents: write
-#   actions: write
-
-# jobs:
-#   collect-price-data:
-#     runs-on: ubuntu-22.04
-#     steps:
-#     - uses: actions/checkout@v4
-#       with:
-#         token: ${{ secrets.GITHUB_TOKEN }}
-        
-#     - name: Set up Python
-#       uses: actions/setup-python@v5
-#       with:
-#         python-version: '3.10'
-        
-#     - name: Install dependencies
-#       run: |
-#         sudo apt-get update
-#         #sudo apt-get install -y libasound2 libicu66 libffi7
-#         python -m pip install --upgrade pip
-#         pip install -r requirements.txt
-#         playwright install
-#         playwright install-deps
-        
-#     - name: Run price collection script
-#       run: python dca-retail_prices.py
-        
-#     - name: Upload artifacts
-#       uses: actions/upload-artifact@v4
-#       with:
-#         name: price-data-${{ github.run_number }}
-#         path: |
-#           data/*.csv
-#           dca_test.xlsx
-#         retention-days: 90
-        
-#     - name: Commit files
-#       run: |
-#         git config --local user.name "github-actions[bot]"
-#         git config --local user.email "github-actions[bot]@users.noreply.github.com"
-#         git add data/*.csv dca_test.xlsx
-#         git commit -m "Added price data and updated Excel file on $(date +'%Y-%m-%d')" || echo "No changes to commit"
-#         git push
-
-#     - name: Push to collaborator repository
-#       env:
-#         COLAB_REPO_PAT: ${{ secrets.COLAB_REPO_PAT }}
-#       run: |
-#         git config --global user.name "GitHub Action"
-#         git config --global user.email "action@github.com"
-        
-#         # Create a temporary directory for the collaborator repo
-#         mkdir temp_repo
-#         cd temp_repo
-        
-#         # Clone the collaborator repository using PAT
-#         git clone https://x-access-token:${COLAB_REPO_PAT}@github.com/abhiruchi97/Inflation-monitor.git .
-        
-#         # Copy only the Excel file from the main repository
-#         cp ../dca_test.xlsx .
-        
-#         # Commit and push changes
-#         git add dca_test.xlsx
-#         git commit -m "Updated Excel file on $(date +'%Y-%m-%d')" || echo "No changes to commit"
-#         git push origin main
-
 name: Daily Price Data Collection
-
 on:
   schedule:
     - cron: '30 2 * * *'
@@ -86,44 +11,28 @@ permissions:
 jobs:
   collect-price-data:
     runs-on: ubuntu-22.04
-
     steps:
     - uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-
+        
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
-
-    - name: Free disk space
-      run: |
-        sudo rm -rf /usr/share/dotnet
-        sudo rm -rf /usr/local/lib/android
-        sudo rm -rf /opt/ghc
-        sudo apt-get clean
-
+        
     - name: Install dependencies
       run: |
         sudo apt-get update
-
+        #sudo apt-get install -y libasound2 libicu66 libffi7
         python -m pip install --upgrade pip
-
-        # Force CPU-only PyTorch (prevents CUDA install)
-        pip install --no-cache-dir torch torchvision \
-          --index-url https://download.pytorch.org/whl/cpu
-
-        # Install remaining dependencies
-        pip install --no-cache-dir -r requirements.txt
-
-        # Install Playwright browsers and system deps
+        pip install -r requirements.txt
         playwright install
         playwright install-deps
-
+        
     - name: Run price collection script
       run: python dca-retail_prices.py
-
+        
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -132,7 +41,7 @@ jobs:
           data/*.csv
           dca_test.xlsx
         retention-days: 90
-
+        
     - name: Commit files
       run: |
         git config --local user.name "github-actions[bot]"
@@ -147,14 +56,18 @@ jobs:
       run: |
         git config --global user.name "GitHub Action"
         git config --global user.email "action@github.com"
-
+        
+        # Create a temporary directory for the collaborator repo
         mkdir temp_repo
         cd temp_repo
-
+        
+        # Clone the collaborator repository using PAT
         git clone https://x-access-token:${COLAB_REPO_PAT}@github.com/abhiruchi97/Inflation-monitor.git .
-
+        
+        # Copy only the Excel file from the main repository
         cp ../dca_test.xlsx .
-
+        
+        # Commit and push changes
         git add dca_test.xlsx
         git commit -m "Updated Excel file on $(date +'%Y-%m-%d')" || echo "No changes to commit"
         git push origin main
