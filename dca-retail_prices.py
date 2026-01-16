@@ -158,20 +158,19 @@ import numpy as np
 from bs4 import BeautifulSoup
 import datetime as dt
 import easyocr
-import time
 import os
 import re
 
-# -----------------------------
+# -------------------------------------------------
 # Utility
-# -----------------------------
+# -------------------------------------------------
 
 def get_yesterday_date():
     return (dt.date.today() - dt.timedelta(days=1)).strftime("%d/%m/%Y")
 
-# -----------------------------
+# -------------------------------------------------
 # CAPTCHA handling
-# -----------------------------
+# -------------------------------------------------
 
 def read_captcha(page, reader):
     captcha_img = page.locator("#ctl00_MainContent_captchalogin")
@@ -183,6 +182,7 @@ def read_captcha(page, reader):
         paragraph=False,
         allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
     )
+
     return results[0].strip() if results else None
 
 
@@ -204,12 +204,13 @@ def handle_captcha(page, reader, max_attempts=3):
 
     return False
 
-# -----------------------------
+# -------------------------------------------------
 # Scraping logic
-# -----------------------------
+# -------------------------------------------------
 
 def run(playwright: Playwright, date: str):
     browser = playwright.chromium.launch(headless=True)
+
     try:
         context = browser.new_context()
         page = context.new_page()
@@ -224,39 +225,55 @@ def run(playwright: Playwright, date: str):
         if not handle_captcha(page, reader):
             raise RuntimeError("CAPTCHA could not be solved")
 
-        html = page.content()
-        soup = BeautifulSoup(html, "lxml")
-
+        soup = BeautifulSoup(page.content(), "lxml")
         table = soup.find("table", id="gv0")
-        headers = [th.text.strip() for th in table.find_all("th")]
 
+        if table is None:
+            raise RuntimeError("Price table not found")
+
+        # ---- Correct row parsing (handles <th> vs <td>)
         rows = []
         for tr in table.find_all("tr")[1:]:
-            cells = [td.text.strip() for td in tr.find_all(["td", "th"])]
-            rows.append(cells)
+            row = []
+
+            # First column always <th>
+            th = tr.find("th")
+            row.append(th.text.strip() if th else None)
+
+            # Remaining columns are <td>
+            tds = tr.find_all("td")
+            row.extend(td.text.strip() for td in tds)
+
+            rows.append(row)
+
+        # Extract headers
+        header_cells = table.find_all("tr")[0].find_all("th")
+        headers = [h.text.strip() for h in header_cells]
 
         df = pd.DataFrame(rows, columns=headers)
 
-        # First column = commodity name
-        commodity_col = df.columns[0]
-        
-        avg_row = df[df[commodity_col].str.strip().eq("Average Price")]
-        
+        # ---- Extract "Average Price" row safely
+        first_col = df.columns[0]
+        avg_row = df[df[first_col].str.strip().eq("Average Price")]
+
         if avg_row.empty:
-            raise RuntimeError(f"'Average Price' row not found. Found rows: {df[commodity_col].unique()}")
-        
+            raise RuntimeError(
+                f"'Average Price' row not found. Found rows: {df[first_col].unique()}"
+            )
+
         price_series = (
             avg_row
             .iloc[0, 1:]
             .replace("", np.nan)
             .astype(float)
         )
-        
-        price_series.index = df.columns[1:]
-        
 
+        price_series.index = df.columns[1:]
+
+        # ---- Save daily CSV
         os.makedirs("data", exist_ok=True)
         out_file = f"data/DCA_price_{date.replace('/', '-')}.csv"
+
         price_series.to_frame(name=f"Date {date}").to_csv(out_file)
 
         return out_file
@@ -264,9 +281,9 @@ def run(playwright: Playwright, date: str):
     finally:
         browser.close()
 
-# -----------------------------
-# Excel updater (robust & idempotent)
-# -----------------------------
+# -------------------------------------------------
+# Excel updater (idempotent & backfilling)
+# -------------------------------------------------
 
 def update_excel(csv_file):
     df_new = pd.read_csv(csv_file, index_col=0)
@@ -281,7 +298,7 @@ def update_excel(csv_file):
     else:
         df_master = pd.DataFrame()
 
-    # Add new commodities
+    # Add new commodities automatically
     all_items = df_master.index.union(price_series.index)
     df_master = df_master.reindex(all_items)
 
@@ -289,7 +306,7 @@ def update_excel(csv_file):
     if date_key not in df_master.columns:
         df_master[date_key] = np.nan
 
-    # Fill values safely
+    # Fill values safely (idempotent)
     df_master.loc[price_series.index, date_key] = price_series
 
     # Sort dates chronologically
@@ -297,9 +314,9 @@ def update_excel(csv_file):
 
     df_master.to_excel("dca_test.xlsx")
 
-# -----------------------------
+# -------------------------------------------------
 # Main
-# -----------------------------
+# -------------------------------------------------
 
 def main():
     date = get_yesterday_date()
@@ -312,4 +329,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
