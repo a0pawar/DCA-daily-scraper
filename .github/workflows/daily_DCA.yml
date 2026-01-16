@@ -24,9 +24,22 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        #sudo apt-get install -y libasound2 libicu66 libffi7
+    
+        # Free disk space
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo apt-get clean
+    
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+    
+        # Install CPU-only PyTorch explicitly
+        pip install --no-cache-dir torch torchvision \
+          --index-url https://download.pytorch.org/whl/cpu
+    
+        # Install remaining dependencies
+        pip install --no-cache-dir -r requirements.txt
+    
         playwright install
         playwright install-deps
         
