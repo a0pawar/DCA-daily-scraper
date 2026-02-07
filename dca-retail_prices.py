@@ -158,7 +158,6 @@ import numpy as np
 import datetime as dt
 import easyocr
 import os
-from io import StringIO
 
 # -------------------------------------------------
 # Utility
@@ -269,18 +268,9 @@ def run(playwright: Playwright, date: str):
         if not handle_captcha(page, reader, date):
             raise RuntimeError("CAPTCHA could not be solved")
 
-        page.wait_for_function(
-            "() => {"
-            "const table = document.querySelector('#gv0');"
-            "if (!table) return false;"
-            "const rows = table.querySelectorAll('tr');"
-            "if (rows.length <= 1) return false;"
-            "return Array.from(rows).some(row => row.querySelector('td'));"
-            "}",
-            timeout=20000,
-        )
+        page.wait_for_selector("#gv0 tr", timeout=10000)
         table_html = page.locator("#gv0").evaluate("el => el.outerHTML")
-        df = pd.read_html(StringIO(table_html), header=0)[0]
+        df = pd.read_html(table_html, header=0)[0]
 
         if df.empty:
             print(f"No data rows returned for date {date}.")
