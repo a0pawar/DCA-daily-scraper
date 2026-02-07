@@ -268,43 +268,16 @@ def run(playwright: Playwright, date: str):
         if not handle_captcha(page, reader, date):
             raise RuntimeError("CAPTCHA could not be solved")
 
-        page.wait_for_function(
-            "() => {"
-            "const table = document.querySelector('#gv0');"
-            "if (!table) return false;"
-            "const rows = table.querySelectorAll('tr');"
-            "if (rows.length <= 1) return false;"
-            "return Array.from(rows).some(row => row.querySelector('td, th'));"
-            "}",
-            timeout=20000,
-        )
-
-        rows = page.eval_on_selector_all(
-            "#gv0 tr",
-            "trs => trs.map(tr => Array.from(tr.querySelectorAll('th, td'))"
-            ".map(cell => cell.innerText.trim()))",
-        )
-        rows = [row for row in rows if any(cell for cell in row)]
-        if len(rows) < 2:
-            print(f"No data rows returned for date {date}.")
-            return None
-
-        headers = rows[0]
-        data_rows = rows[1:]
-        max_len = max(len(headers), max(len(row) for row in data_rows))
-        if len(headers) < max_len:
-            headers.extend([f"Column {idx + 1}" for idx in range(len(headers), max_len)])
-        normalized_rows = []
-        for row in data_rows:
-            if len(row) < max_len:
-                row = row + [""] * (max_len - len(row))
-            normalized_rows.append(row)
-
-        df = pd.DataFrame(normalized_rows, columns=headers)
+        page.wait_for_selector("#gv0 tr", timeout=10000)
+        table_html = page.locator("#gv0").evaluate("el => el.outerHTML")
+        df = pd.read_html(table_html, header=0)[0]
 
         if df.empty:
             print(f"No data rows returned for date {date}.")
             return None
+
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = [col[-1] for col in df.columns]
 
         # ---- Extract "Average Price" row safely
         first_col = df.columns[0]
