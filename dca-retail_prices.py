@@ -168,6 +168,46 @@ import re
 def get_yesterday_date():
     return (dt.date.today() - dt.timedelta(days=1)).strftime("%d/%m/%Y")
 
+def parse_date_column(column_name):
+    for fmt in ("%d-%m-%Y", "%d/%m/%Y"):
+        try:
+            return dt.datetime.strptime(str(column_name), fmt).date()
+        except ValueError:
+            continue
+    return None
+
+def get_dates_to_process(excel_path):
+    yesterday = dt.date.today() - dt.timedelta(days=1)
+
+    if not os.path.exists(excel_path):
+        return [get_yesterday_date()], set()
+
+    columns = pd.read_excel(excel_path, nrows=0).columns
+    parsed_dates = []
+    existing_keys = set()
+
+    for column in columns:
+        parsed_date = parse_date_column(column)
+        if parsed_date:
+            parsed_dates.append(parsed_date)
+            existing_keys.add(parsed_date.strftime("%d-%m-%Y"))
+
+    if not parsed_dates:
+        return [get_yesterday_date()], existing_keys
+
+    last_date = max(parsed_dates)
+    start_date = last_date + dt.timedelta(days=1)
+
+    if start_date > yesterday:
+        return [], existing_keys
+
+    date_range = [
+        (start_date + dt.timedelta(days=offset)).strftime("%d/%m/%Y")
+        for offset in range((yesterday - start_date).days + 1)
+    ]
+
+    return date_range, existing_keys
+
 # -------------------------------------------------
 # CAPTCHA handling
 # -------------------------------------------------
@@ -324,12 +364,17 @@ def update_excel(csv_file):
 # -------------------------------------------------
 
 def main():
-    date = get_yesterday_date()
+    dates_to_process, existing_keys = get_dates_to_process("dca_test.xlsx")
 
     with sync_playwright() as playwright:
-        csv_file = run(playwright, date)
+        for date in dates_to_process:
+            date_key = date.replace("/", "-")
+            if date_key in existing_keys:
+                continue
 
-    update_excel(csv_file)
+            csv_file = run(playwright, date)
+            update_excel(csv_file)
+            existing_keys.add(date_key)
 
 
 if __name__ == "__main__":
