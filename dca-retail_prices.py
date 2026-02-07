@@ -309,9 +309,9 @@ def run(playwright: Playwright, date: str):
         price_series = (
             avg_row
             .iloc[0, 1:]
-            .replace("", np.nan)
-            .astype(float)
+            .replace(["", "-", "NA", "N/A"], np.nan)
         )
+        price_series = pd.to_numeric(price_series, errors="coerce")
 
         price_series.index = df.columns[1:]
 
