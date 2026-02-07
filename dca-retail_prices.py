@@ -172,6 +172,12 @@ def get_yesterday_date():
 # CAPTCHA handling
 # -------------------------------------------------
 
+def select_report_options(page, date):
+    page.get_by_text("Price report").click()
+    page.locator("#ctl00_MainContent_Ddl_Rpt_Option0").select_option("Daily Prices")
+    page.locator("#ctl00_MainContent_Txt_FrmDate").fill(date)
+
+
 def read_captcha(page, reader):
     captcha_img = page.locator("#ctl00_MainContent_captchalogin")
     screenshot = captcha_img.screenshot()
@@ -186,7 +192,7 @@ def read_captcha(page, reader):
     return results[0].strip() if results else None
 
 
-def handle_captcha(page, reader, max_attempts=3):
+def handle_captcha(page, reader, date, max_attempts=3):
     for _ in range(max_attempts):
         captcha_text = read_captcha(page, reader)
         if not captcha_text:
@@ -201,6 +207,7 @@ def handle_captcha(page, reader, max_attempts=3):
             return True
         except:
             page.reload(wait_until="domcontentloaded")
+            select_report_options(page, date)
 
     return False
 
@@ -216,13 +223,11 @@ def run(playwright: Playwright, date: str):
         page = context.new_page()
 
         page.goto("https://fcainfoweb.nic.in/reports/report_menu_web.aspx")
-        page.get_by_text("Price report").click()
-        page.locator("#ctl00_MainContent_Ddl_Rpt_Option0").select_option("Daily Prices")
-        page.locator("#ctl00_MainContent_Txt_FrmDate").fill(date)
+        select_report_options(page, date)
 
         reader = easyocr.Reader(["en"], gpu=False, verbose=False)
 
-        if not handle_captcha(page, reader):
+        if not handle_captcha(page, reader, date):
             raise RuntimeError("CAPTCHA could not be solved")
 
         soup = BeautifulSoup(page.content(), "lxml")
