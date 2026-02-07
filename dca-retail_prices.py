@@ -155,11 +155,9 @@
 from playwright.sync_api import sync_playwright, Playwright
 import pandas as pd
 import numpy as np
-from bs4 import BeautifulSoup
 import datetime as dt
 import easyocr
 import os
-import re
 
 # -------------------------------------------------
 # Utility
@@ -242,7 +240,7 @@ def handle_captcha(page, reader, date, max_attempts=3):
         page.get_by_role("button", name="Get Data").click()
 
         try:
-            page.wait_for_selector("#gv0", timeout=5000)
+            page.wait_for_selector("#gv0", timeout=10000)
             print("CAPTCHA solved successfully!")
             return True
         except:
@@ -270,41 +268,54 @@ def run(playwright: Playwright, date: str):
         if not handle_captcha(page, reader, date):
             raise RuntimeError("CAPTCHA could not be solved")
 
-        soup = BeautifulSoup(page.content(), "lxml")
-        table = soup.find("table", id="gv0")
+        page.wait_for_function(
+            "() => {"
+            "const table = document.querySelector('#gv0');"
+            "if (!table) return false;"
+            "const rows = table.querySelectorAll('tr');"
+            "if (rows.length <= 1) return false;"
+            "return Array.from(rows).some(row => row.querySelector('td, th'));"
+            "}",
+            timeout=20000,
+        )
 
-        if table is None:
-            raise RuntimeError("Price table not found")
+        rows = page.eval_on_selector_all(
+            "#gv0 tr",
+            "trs => trs.map(tr => Array.from(tr.querySelectorAll('th, td'))"
+            ".map(cell => cell.innerText.trim()))",
+        )
+        rows = [row for row in rows if any(cell for cell in row)]
+        if len(rows) < 2:
+            print(f"No data rows returned for date {date}.")
+            return None
 
-        # ---- Correct row parsing (handles <th> vs <td>)
-        rows = []
-        for tr in table.find_all("tr")[1:]:
-            row = []
+        headers = rows[0]
+        data_rows = rows[1:]
+        max_len = max(len(headers), max(len(row) for row in data_rows))
+        if len(headers) < max_len:
+            headers.extend([f"Column {idx + 1}" for idx in range(len(headers), max_len)])
+        normalized_rows = []
+        for row in data_rows:
+            if len(row) < max_len:
+                row = row + [""] * (max_len - len(row))
+            normalized_rows.append(row)
 
-            # First column always <th>
-            th = tr.find("th")
-            row.append(th.text.strip() if th else None)
+        df = pd.DataFrame(normalized_rows, columns=headers)
 
-            # Remaining columns are <td>
-            tds = tr.find_all("td")
-            row.extend(td.text.strip() for td in tds)
-
-            rows.append(row)
-
-        # Extract headers
-        header_cells = table.find_all("tr")[0].find_all("th")
-        headers = [h.text.strip() for h in header_cells]
-
-        df = pd.DataFrame(rows, columns=headers)
+        if df.empty:
+            print(f"No data rows returned for date {date}.")
+            return None
 
         # ---- Extract "Average Price" row safely
         first_col = df.columns[0]
-        avg_row = df[df[first_col].str.strip().eq("Average Price")]
+        avg_row = df[df[first_col].astype(str).str.contains("Average Price", case=False, na=False)]
 
         if avg_row.empty:
-            raise RuntimeError(
-                f"'Average Price' row not found. Found rows: {df[first_col].unique()}"
+            print(
+                "'Average Price' row not found. "
+                f"Found rows: {df[first_col].unique()}"
             )
+            return None
 
         price_series = (
             avg_row
@@ -373,6 +384,10 @@ def main():
                 continue
 
             csv_file = run(playwright, date)
+            if not csv_file:
+                print(f"Skipping update for {date}; no data returned.")
+                continue
+
             update_excel(csv_file)
             existing_keys.add(date_key)
 
