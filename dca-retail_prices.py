@@ -1,163 +1,10 @@
-# from playwright.sync_api import Playwright, sync_playwright, expect
-# import time
-# import pandas as pd
-# import numpy as np
-# from bs4 import BeautifulSoup
-# import datetime as dt
-# import re
-# import os
-# import easyocr
-
-# def get_yesterday_date():
-#     yesterday = dt.date.today() - dt.timedelta(days=1)
-#     return yesterday.strftime("%d/%m/%Y")
-
-# def read_captcha(page, reader):
-#     try:
-#         # Get CAPTCHA image
-#         captcha_img = page.locator("#ctl00_MainContent_captchalogin")
-#         screenshot = captcha_img.screenshot()
-        
-#         # Perform OCR directly on the screenshot
-#         results = reader.readtext(screenshot)
-        
-#         # Extract text from results
-#         if results:
-#             # Take the text from the first result
-#             captcha_text = ''.join(c for c in results[0][1] if c.isalnum())
-#             print(f"Detected CAPTCHA text: {captcha_text}")
-#             return captcha_text
-            
-#         return None
-        
-#     except Exception as e:
-#         print(f"Error reading CAPTCHA: {str(e)}")
-#         return None
-
-# def handle_captcha(page, reader, max_attempts=3):
-#     for attempt in range(max_attempts):
-#         try:
-#             captcha_input = page.locator("#ctl00_MainContent_Captcha")
-#             captcha_text = read_captcha(page, reader)
-            
-#             if not captcha_text:
-#                 print(f"Failed to read CAPTCHA on attempt {attempt + 1}")
-#                 continue
-                
-#             print(f"Attempting CAPTCHA with text: {captcha_text}")
-#             captcha_input.fill(captcha_text)
-#             time.sleep(1)
-            
-#             page.get_by_role("button", name="Get Data").click()
-            
-#             try:
-#                 page.wait_for_selector("#gv0", timeout=5000)
-#                 print("CAPTCHA solved successfully!")
-#                 return True
-#             except:
-#                 print("CAPTCHA validation failed, trying again...")
-#                 page.reload()
-#                 time.sleep(2)
-#                 continue
-                
-#         except Exception as e:
-#             print(f"CAPTCHA attempt {attempt + 1} failed: {str(e)}")
-#             if attempt < max_attempts - 1:
-#                 page.reload()
-#                 time.sleep(2)
-#             continue
-    
-#     return False
-
-# def run(playwright: Playwright, date, reader) -> None:
-#     browser = playwright.chromium.launch(headless=True)
-#     context = browser.new_context()
-#     page = context.new_page()
-#     page.goto("https://fcainfoweb.nic.in/reports/report_menu_web.aspx")
-#     time.sleep(1)
-    
-#     # Select report options
-#     page.get_by_text("Price report").click()
-#     page.locator("#ctl00_MainContent_Ddl_Rpt_Option0").select_option("Daily Prices")
-#     page.locator("#ctl00_MainContent_Txt_FrmDate").click()
-#     time.sleep(2)
-#     page.locator("#ctl00_MainContent_Txt_FrmDate").fill(date)
-#     time.sleep(2)
-    
-#     # Handle CAPTCHA
-#     if not handle_captcha(page, reader):
-#         print("Failed to solve CAPTCHA after maximum attempts")
-#         context.close()
-#         browser.close()
-#         return
-    
-#     # Get page content
-#     htm = page.content()
-#     html_soup = BeautifulSoup(htm, 'lxml')
-   
-#     # Parse tables and process data
-#     first_table = html_soup.find('table')
-#     thead_rows = first_table.find('thead').find_all('b')
-#     heads = [re.sub(r'[^0-9a-zA-Z./(): ]', '', t.text) for t in thead_rows]
-    
-#     second_table = html_soup.find('table', {'id': 'gv0'})
-#     headers = [header.text.strip() for header in second_table.find_all('th')]
-#     data = []
-#     for row in second_table.find_all('tr')[1:]:
-#         row_data = [cell.text.strip() for cell in row.find_all(['td', 'th'])]
-#         data.append(row_data)
-    
-#     # Create DataFrame
-#     df_head = pd.DataFrame(heads)
-#     df = pd.DataFrame(data, columns=headers)
-#     df = pd.concat([df_head, df], axis=1)
-#     df = df.T.reset_index()
-#     daily_date = df.iloc[0,2].strip().split("e")[1]
-#     daily_date = "Date "+daily_date
-#     unit = "Unit:(Rs./Kg.)"
-#     verbose = "Daily Retail Prices Of Essential Commodities"
-#     df.columns = df.iloc[1,:]
-#     df = df.iloc[2:,:]
-#     df[daily_date] = [verbose, unit] + [np.nan] * (len(df) - 2)
-#     cols = [daily_date] + [col for col in df.columns if col != daily_date]
-#     df = df[cols]
-    
-#     # Save to CSV
-#     os.makedirs('data', exist_ok=True)
-#     output_file = os.path.join('data', f'DCA_price_{date.replace("/", "-")}.csv')
-#     df.to_csv(output_file, index=False)
-    
-#     context.close()
-#     browser.close()
-
-# def update_excel(date):
-#     ofile = os.path.join('data', f'DCA_price_{date.replace("/", "-")}.csv')
-#     dt_temp = pd.read_csv(ofile)
-#     date_add = dt_temp.columns[0].split(" ")[1].replace("/","-")
-#     vals = dt_temp['Average Price'].values
-    
-#     df = pd.read_excel('dca_test.xlsx')
-#     df[f'{date_add}'] = vals
-#     df.to_excel('dca_test.xlsx', index=False)
-
-# def main():
-#     # Initialize EasyOCR reader once
-#     reader = easyocr.Reader(['en'])
-    
-#     date = get_yesterday_date()
-#     with sync_playwright() as playwright:
-#         run(playwright, date, reader)
-#     update_excel(date)
-
-# if __name__ == "__main__":
-#     main()
-
 from playwright.sync_api import sync_playwright, Playwright
 import pandas as pd
 import numpy as np
 import datetime as dt
 import easyocr
 import os
+import time
 
 # -------------------------------------------------
 # Utility
@@ -211,42 +58,82 @@ def get_dates_to_process(excel_path):
 # -------------------------------------------------
 
 def select_report_options(page, date):
-    page.get_by_text("Price report").click()
-    page.locator("#ctl00_MainContent_Ddl_Rpt_Option0").select_option("Daily Prices")
-    page.locator("#ctl00_MainContent_Txt_FrmDate").fill(date)
+    """Select report options with proper waits"""
+    try:
+        page.get_by_text("Price report").click()
+        page.wait_for_load_state("networkidle", timeout=5000)
+        
+        page.locator("#ctl00_MainContent_Ddl_Rpt_Option0").select_option("Daily Prices")
+        page.wait_for_load_state("networkidle", timeout=5000)
+        
+        page.locator("#ctl00_MainContent_Txt_FrmDate").fill(date)
+        page.wait_for_load_state("networkidle", timeout=5000)
+    except Exception as e:
+        print(f"Error selecting report options: {e}")
+        raise
 
 
 def read_captcha(page, reader):
-    captcha_img = page.locator("#ctl00_MainContent_captchalogin")
-    screenshot = captcha_img.screenshot()
+    """Read CAPTCHA with error handling"""
+    try:
+        captcha_img = page.locator("#ctl00_MainContent_captchalogin")
+        # Wait for the image to be visible
+        captcha_img.wait_for(state="visible", timeout=5000)
+        screenshot = captcha_img.screenshot()
 
-    results = reader.readtext(
-        screenshot,
-        detail=0,
-        paragraph=False,
-        allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-    )
+        results = reader.readtext(
+            screenshot,
+            detail=0,
+            paragraph=False,
+            allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+        )
 
-    return results[0].strip() if results else None
+        return results[0].strip() if results else None
+    except Exception as e:
+        print(f"Error reading CAPTCHA: {e}")
+        return None
 
 
-def handle_captcha(page, reader, date, max_attempts=3):
-    for _ in range(max_attempts):
-        captcha_text = read_captcha(page, reader)
-        if not captcha_text:
-            continue
-
-        page.locator("#ctl00_MainContent_Captcha").fill(captcha_text)
-        page.get_by_role("button", name="Get Data").click()
-
+def handle_captcha(page, reader, date, max_attempts=5):
+    """Enhanced CAPTCHA handling with better retry logic"""
+    for attempt in range(max_attempts):
         try:
-            page.wait_for_selector("#gv0", timeout=10000)
-            print("CAPTCHA solved successfully!")
-            return True
-        except:
-            page.reload(wait_until="domcontentloaded")
-            select_report_options(page, date)
+            print(f"CAPTCHA attempt {attempt + 1}/{max_attempts}")
+            
+            captcha_text = read_captcha(page, reader)
+            if not captcha_text:
+                print(f"Could not read CAPTCHA text on attempt {attempt + 1}")
+                time.sleep(2)
+                page.reload(wait_until="domcontentloaded")
+                time.sleep(2)
+                continue
 
+            page.locator("#ctl00_MainContent_Captcha").fill(captcha_text)
+            page.get_by_role("button", name="Get Data").click()
+
+            try:
+                page.wait_for_selector("#gv0", timeout=30000)
+                print("CAPTCHA solved successfully!")
+                return True
+            except:
+                print("CAPTCHA validation failed, retrying...")
+                page.reload(wait_until="domcontentloaded")
+                time.sleep(3)
+                try:
+                    select_report_options(page, date)
+                except:
+                    pass
+                
+        except Exception as e:
+            print(f"CAPTCHA attempt {attempt + 1} exception: {e}")
+            time.sleep(2)
+            try:
+                page.reload(wait_until="domcontentloaded")
+                time.sleep(2)
+            except:
+                pass
+
+    print("Failed to solve CAPTCHA after all attempts")
     return False
 
 # -------------------------------------------------
@@ -254,21 +141,33 @@ def handle_captcha(page, reader, date, max_attempts=3):
 # -------------------------------------------------
 
 def run(playwright: Playwright, date: str):
+    """Main scraping function with enhanced error handling"""
     browser = playwright.chromium.launch(headless=True)
 
     try:
+        # Set longer timeout at context level
         context = browser.new_context()
         page = context.new_page()
+        page.set_default_timeout(60000)  # 60 seconds default timeout
 
-        page.goto("https://fcainfoweb.nic.in/reports/report_menu_web.aspx")
+        print(f"Navigating to website for date {date}")
+        page.goto("https://fcainfoweb.nic.in/reports/report_menu_web.aspx", 
+                  wait_until="domcontentloaded", timeout=60000)
+        time.sleep(3)  # Initial page load wait
+        
         select_report_options(page, date)
+        time.sleep(2)
 
         reader = easyocr.Reader(["en"], gpu=False, verbose=False)
 
         if not handle_captcha(page, reader, date):
             raise RuntimeError("CAPTCHA could not be solved")
 
-        page.wait_for_selector("#gv0 tr", timeout=10000)
+        # Wait for table to load
+        page.wait_for_selector("#gv0", timeout=30000)
+        page.wait_for_selector("#gv0 tr", timeout=15000)
+        time.sleep(2)
+
         table_html = page.locator("#gv0").evaluate("el => el.outerHTML")
         df = pd.read_html(table_html, header=0)[0]
 
@@ -304,9 +203,13 @@ def run(playwright: Playwright, date: str):
         out_file = f"data/DCA_price_{date.replace('/', '-')}.csv"
 
         price_series.to_frame(name=f"Date {date}").to_csv(out_file)
+        print(f"Successfully saved data to {out_file}")
 
         return out_file
 
+    except Exception as e:
+        print(f"Error in scraping process: {e}")
+        return None
     finally:
         browser.close()
 
@@ -315,54 +218,68 @@ def run(playwright: Playwright, date: str):
 # -------------------------------------------------
 
 def update_excel(csv_file):
-    df_new = pd.read_csv(csv_file, index_col=0)
+    """Update Excel file with new data"""
+    try:
+        df_new = pd.read_csv(csv_file, index_col=0)
 
-    date_col = df_new.columns[0]
-    date_key = date_col.replace("Date ", "").replace("/", "-")
+        date_col = df_new.columns[0]
+        date_key = date_col.replace("Date ", "").replace("/", "-")
 
-    price_series = df_new[date_col]
+        price_series = df_new[date_col]
 
-    if os.path.exists("dca_test.xlsx"):
-        df_master = pd.read_excel("dca_test.xlsx", index_col=0)
-    else:
-        df_master = pd.DataFrame()
+        if os.path.exists("dca_test.xlsx"):
+            df_master = pd.read_excel("dca_test.xlsx", index_col=0)
+        else:
+            df_master = pd.DataFrame()
 
-    # Add new commodities automatically
-    all_items = df_master.index.union(price_series.index)
-    df_master = df_master.reindex(all_items)
+        # Add new commodities automatically
+        all_items = df_master.index.union(price_series.index)
+        df_master = df_master.reindex(all_items)
 
-    # Add date column if missing
-    if date_key not in df_master.columns:
-        df_master[date_key] = np.nan
+        # Add date column if missing
+        if date_key not in df_master.columns:
+            df_master[date_key] = np.nan
 
-    # Fill values safely (idempotent)
-    df_master.loc[price_series.index, date_key] = price_series
+        # Fill values safely (idempotent)
+        df_master.loc[price_series.index, date_key] = price_series
 
-    # Sort dates chronologically
-    df_master = df_master.sort_index(axis=1)
+        # Sort dates chronologically
+        df_master = df_master.sort_index(axis=1)
 
-    df_master.to_excel("dca_test.xlsx")
+        df_master.to_excel("dca_test.xlsx")
+        print(f"Successfully updated dca_test.xlsx with data from {csv_file}")
+    except Exception as e:
+        print(f"Error updating Excel: {e}")
 
 # -------------------------------------------------
 # Main
 # -------------------------------------------------
 
 def main():
-    dates_to_process, existing_keys = get_dates_to_process("dca_test.xlsx")
+    try:
+        dates_to_process, existing_keys = get_dates_to_process("dca_test.xlsx")
 
-    with sync_playwright() as playwright:
-        for date in dates_to_process:
-            date_key = date.replace("/", "-")
-            if date_key in existing_keys:
-                continue
+        if not dates_to_process:
+            print("No dates to process.")
+            return
 
-            csv_file = run(playwright, date)
-            if not csv_file:
-                print(f"Skipping update for {date}; no data returned.")
-                continue
+        with sync_playwright() as playwright:
+            for date in dates_to_process:
+                date_key = date.replace("/", "-")
+                if date_key in existing_keys:
+                    print(f"Skipping {date_key} - already processed")
+                    continue
 
-            update_excel(csv_file)
-            existing_keys.add(date_key)
+                print(f"\nProcessing date: {date}")
+                csv_file = run(playwright, date)
+                if not csv_file:
+                    print(f"Skipping update for {date}; no data returned.")
+                    continue
+
+                update_excel(csv_file)
+                existing_keys.add(date_key)
+    except Exception as e:
+        print(f"Critical error in main: {e}")
 
 
 if __name__ == "__main__":
